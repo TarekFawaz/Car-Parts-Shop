@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 namespace Car_Parts_Shop
 {
+
+    // This is for training purposes 
     public class part
     {
         public string SerialNo;
