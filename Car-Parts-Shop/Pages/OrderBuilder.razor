@@ -1,0 +1,147 @@
+@page "/"
+
+<h1>Order Builder</h1>
+<p class="muted">Drag parts from the inventory onto the order area to build a custom order.</p>
+
+<div class="order-builder">
+    <section class="inventory-list">
+        <h2>Available Inventory</h2>
+        <div class="inventory-grid">
+            @foreach (var part in Inventory)
+            {
+                <div class="part-card"
+                     draggable="true"
+                     @ondragstart="@(() => StartDrag(part))">
+                    <strong>@part.Name</strong>
+                    <span class="badge">@part.Category</span>
+                    <small>SKU: @part.PartNumber</small>
+                    <small>Origin: @part.CountryOfOrigin</small>
+                    <small>Warranty: @part.WarrantyYears years</small>
+                    @if (part is SeatBelt seatBelt)
+                    {
+                        <small>Seat belt: @seatBelt.Color, @seatBelt.Thickness mm</small>
+                    }
+                    <strong>@part.Price.ToString("C", CultureInfo.CurrentCulture)</strong>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="order-panel">
+        <h2>Order Workspace</h2>
+        <div class="drop-zone @DropZoneClass"
+             @ondrop="HandleDrop"
+             @ondrop:preventDefault="true"
+             @ondragover="HandleDragOver"
+             @ondragover:preventDefault="true"
+             @ondragleave="HandleDragLeave">
+            @if (OrderLines.Count == 0)
+            {
+                <p class="muted">Drop parts here to start the order.</p>
+            }
+            else
+            {
+                @foreach (var line in OrderLines)
+                {
+                    <div class="order-line">
+                        <div>
+                            <strong>@line.Part.Name</strong>
+                            <div class="muted">SKU: @line.Part.PartNumber</div>
+                        </div>
+                        <div>Qty: @line.Quantity</div>
+                        <button class="button-link" type="button" @onclick="() => RemoveLine(line)">
+                            Remove
+                        </button>
+                    </div>
+                }
+            }
+        </div>
+
+        <div class="order-totals">
+            <div>Subtotal: @Subtotal.ToString("C", CultureInfo.CurrentCulture)</div>
+            <div>Estimated Tax (8%): @TaxValue.ToString("C", CultureInfo.CurrentCulture)</div>
+            <div>Total: @Total.ToString("C", CultureInfo.CurrentCulture)</div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private readonly List<Part> Inventory = new()
+    {
+        new Part("BRK-4477", "Brake Pad Set", "Braking", "Germany", 2, 89.99m),
+        new Part("OIL-1001", "Engine Oil 5W-30", "Fluids", "USA", 0, 29.50m, canExpire: true, expiryYears: 3),
+        new Part("AIR-3322", "Cabin Air Filter", "Filters", "Japan", 1, 22.75m),
+        new Part("BAT-2200", "12V Battery", "Electrical", "USA", 3, 169.00m, canExpire: true, expiryYears: 5),
+        new Part("SPK-7811", "Spark Plug Pack", "Ignition", "Mexico", 1, 44.25m),
+        new Part("WIP-1505", "All-Season Wiper Blades", "Exterior", "China", 1, 18.99m),
+        new SeatBelt("SEA-9090", "Seat Belt Assembly", "Safety", "Egypt", 5, 129.99m, 5.5m, "Red"),
+        new Part("TIR-3030", "Touring Tire", "Wheels", "Thailand", 4, 122.00m),
+        new Part("LGT-5566", "LED Headlight Kit", "Lighting", "South Korea", 2, 210.00m),
+        new Part("RAD-4411", "Radiator", "Cooling", "Turkey", 2, 199.99m)
+    };
+
+    private readonly List<OrderLine> OrderLines = new();
+    private Part? _draggingPart;
+    private bool _isDraggingOver;
+
+    private string DropZoneClass => _isDraggingOver ? "active" : string.Empty;
+
+    private void StartDrag(Part part)
+    {
+        _draggingPart = part;
+        _isDraggingOver = true;
+    }
+
+    private void HandleDrop()
+    {
+        if (_draggingPart is null)
+        {
+            _isDraggingOver = false;
+            return;
+        }
+
+        var existingLine = OrderLines.FirstOrDefault(line => line.Part.PartNumber == _draggingPart.PartNumber);
+        if (existingLine is null)
+        {
+            OrderLines.Add(new OrderLine(_draggingPart, 1));
+        }
+        else
+        {
+            existingLine.Quantity += 1;
+        }
+
+        _draggingPart = null;
+        _isDraggingOver = false;
+    }
+
+    private void HandleDragOver()
+    {
+        _isDraggingOver = true;
+    }
+
+    private void HandleDragLeave()
+    {
+        _isDraggingOver = false;
+    }
+
+    private void RemoveLine(OrderLine line)
+    {
+        OrderLines.Remove(line);
+    }
+
+    private decimal Subtotal => OrderLines.Sum(line => line.Part.Price * line.Quantity);
+    private decimal TaxValue => Subtotal * 0.08m;
+    private decimal Total => Subtotal + TaxValue;
+
+    private sealed class OrderLine
+    {
+        public OrderLine(Part part, int quantity)
+        {
+            Part = part;
+            Quantity = quantity;
+        }
+
+        public Part Part { get; }
+        public int Quantity { get; set; }
+    }
+}
